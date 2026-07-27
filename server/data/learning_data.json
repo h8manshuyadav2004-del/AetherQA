@@ -1,0 +1,49 @@
+{
+  "successfulScenarios": {},
+  "failurePatterns": {},
+  "performanceMetrics": {},
+  "adaptationHistory": [
+    {
+      "timestamp": "2025-10-11T11:06:59.599Z",
+      "url": "https://gemini.google.com",
+      "patternsDetected": 0,
+      "confidence": 0
+    },
+    {
+      "timestamp": "2025-10-11T11:21:20.122Z",
+      "url": "https://gemini.google.com",
+      "patternsDetected": 0,
+      "confidence": 0
+    },
+    {
+      "timestamp": "2025-10-11T11:30:48.176Z",
+      "url": "https://gemini.google.com",
+      "patternsDetected": 0,
+      "confidence": 0
+    },
+    {
+      "timestamp": "2025-10-11T11:34:52.912Z",
+      "url": "https://gemini.google.com",
+      "patternsDetected": 0,
+      "confidence": 0
+    },
+    {
+      "timestamp": "2025-10-11T12:17:02.518Z",
+      "url": "https://gemini.google.com",
+      "patternsDetected": 0,
+      "confidence": 0
+    },
+    {
+      "timestamp": "2025-10-11T12:20:40.502Z",
+      "url": "https://gemini.google.com",
+      "patternsDetected": 0,
+      "confidence": 0
+    },
+    {
+      "timestamp": "2025-10-11T12:22:42.610Z",
+      "url": "https://gemini.google.com",
+      "patternsDetected": 0,
+      "confidence": 0
+    }
+  ]
+}

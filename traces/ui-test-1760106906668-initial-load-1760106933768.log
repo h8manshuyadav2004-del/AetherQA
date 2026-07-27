@@ -1,0 +1,11 @@
+{
+  "timestamp": "2025-10-10T14:35:33.768Z",
+  "testId": "test-1760106906668",
+  "action": "Screenshot: initial-load",
+  "url": "https://example.com/",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "filename": "screenshot-test-1760106906668-initial-load-1760106933650.png"
+}

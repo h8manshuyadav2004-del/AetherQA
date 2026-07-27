@@ -1,0 +1,5 @@
+{
+  "name": "Web Application Test AI Agent",
+  "description": "A multi-agent AI system that autonomously tests web applications end-to-end, covering UI, functional logic, and database layers.",
+  "requestFramePermissions": []
+}
