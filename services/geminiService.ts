@@ -2,13 +2,13 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { AgentType, TestResult, AdvancedModule, A11yAgentType, A11yReport } from '../types';
 import { realTestingService } from './realTestingService';
 
-const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
-if (!apiKey) {
-  throw new Error("GEMINI_API_KEY environment variable not set");
-}
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
-const ai = new GoogleGenAI({ apiKey });
-const model = 'gemini-2.5-flash';
+const ai = apiKey
+  ? new GoogleGenAI({ apiKey })
+  : null;
+
+const model = "gemini-2.5-flash";
 
 const marketControllerPrompt = (url: string, budget: number, activeModules: string[]) => `You are a Market Controller AI for TestMarket, managing an E2E test of ${url} with a budget of ${budget} compute units. Active mechanisms: ${activeModules.join(', ')}.
 Generate a realistic, time-ordered stream of 10-12 concise log messages simulating a market-driven test.

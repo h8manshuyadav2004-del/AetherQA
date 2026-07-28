@@ -42,7 +42,7 @@ if (!existsSync(envPath)) {
       console.log('✅ Created .env.local from template');
     } else {
       // Create basic file
-      const envContent = `GEMINI_API_KEY=your_gemini_api_key_here\nPORT=3001\nNODE_ENV=development`;
+      const envContent = `VITE_GEMINI_API_KEY=your_gemini_api_key_here\nPORT=3001\nNODE_ENV=development`;
       execSync(`echo ${envContent} > .env.local`, { shell: true });
       console.log('✅ Created basic .env.local file');
     }
