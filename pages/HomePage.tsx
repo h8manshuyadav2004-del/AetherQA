@@ -7,7 +7,7 @@ import { VisualDashboard } from '../components/VisualDashboard';
 import { AdvancedFeaturesPanel } from '../components/AdvancedFeaturesPanel';
 import { CrewAIConcepts } from '../components/CrewAIConcepts';
 import { AgentType, AgentStatus, AgentState, TestResult, AdvancedModule, ModalType } from '../types';
-import { runOrchestratorSimulation, runAgentSimulation, generateFinalReport, runRealTest } from '../services/geminiService';
+// import { runOrchestratorSimulation, runAgentSimulation, generateFinalReport, runRealTest } from '../services/geminiService';
 import { SupportModal } from '../components/modals/SupportModal';
 import { ResearchModal } from '../components/modals/ResearchModal';
 import { CodeReviewModal } from '../components/modals/CodeReviewModal';
@@ -101,147 +101,151 @@ export const HomePage: React.FC = () => {
     }
   };
 
-  const handleStartTest = useCallback(async () => {
-    if (!url.trim()) return;
 
-    setIsTesting(true);
-    resetState();
+  const handleStartTest = useCallback(() => {
+  console.log("clicked");
+}, []);
+  // const handleStartTest = useCallback(async () => {
+  //   if (!url.trim()) return;
 
-    try {
-      const activeModules = Object.entries(advancedModules)
-        .filter(([, isActive]) => isActive)
-        .map(([name]) => name as AdvancedModule);
+  //   setIsTesting(true);
+  //   resetState();
 
-      // Set Market Controller to Running at start
-      setMarketData(prev => ({ ...prev, status: AgentStatus.Running }));
+  //   try {
+  //     const activeModules = Object.entries(advancedModules)
+  //       .filter(([, isActive]) => isActive)
+  //       .map(([name]) => name as AdvancedModule);
 
-      // Add initial orchestrator log
-      setTimeout(() => {
-        setMarketData(prev => ({
-          ...prev,
-          logs: [...prev.logs, `Starting test session for ${url} with budget ${budget} compute units`]
-        }));
-      }, 500);
+  //     // Set Market Controller to Running at start
+  //     setMarketData(prev => ({ ...prev, status: AgentStatus.Running }));
 
-      // Try real testing first, with fallback to simulation
-      const finalReport = await runRealTest(url, budget, activeModules, (update) => {
-        if (update.type === 'log') {
-          const agentName = update.agent.toLowerCase();
+  //     // Add initial orchestrator log
+  //     setTimeout(() => {
+  //       setMarketData(prev => ({
+  //         ...prev,
+  //         logs: [...prev.logs, `Starting test session for ${url} with budget ${budget} compute units`]
+  //       }));
+  //     }, 500);
 
-          if (agentName === 'orchestrator') {
-            setMarketData(prev => ({ ...prev, logs: [...prev.logs, update.message] }));
-          } else if (agentName === 'ui' || agentName === 'functional' || agentName === 'db') {
-            const agentKey = agentName === 'ui' ? AgentType.UI :
-              agentName === 'functional' ? AgentType.Functional : AgentType.DB;
+  //     // Try real testing first, with fallback to simulation
+  //     const finalReport = await runRealTest(url, budget, activeModules, (update) => {
+  //       if (update.type === 'log') {
+  //         const agentName = update.agent.toLowerCase();
 
-            setAgentData(prev => {
-              const currentAgent = prev[agentKey];
-              const newLogs = [...currentAgent.logs, update.message];
+  //         if (agentName === 'orchestrator') {
+  //           setMarketData(prev => ({ ...prev, logs: [...prev.logs, update.message] }));
+  //         } else if (agentName === 'ui' || agentName === 'functional' || agentName === 'db') {
+  //           const agentKey = agentName === 'ui' ? AgentType.UI :
+  //             agentName === 'functional' ? AgentType.Functional : AgentType.DB;
 
-              // Auto-set status to Running when first log appears
-              let newStatus = currentAgent.status;
-              if (currentAgent.status === AgentStatus.Idle && newLogs.length === 1) {
-                newStatus = AgentStatus.Running;
-              }
-              // Auto-set status to Completed when agent says it's complete
-              if (update.message.toLowerCase().includes('complete') ||
-                update.message.toLowerCase().includes('finished') ||
-                update.message.toLowerCase().includes('task complete')) {
-                newStatus = AgentStatus.Completed;
-              }
+  //           setAgentData(prev => {
+  //             const currentAgent = prev[agentKey];
+  //             const newLogs = [...currentAgent.logs, update.message];
 
-              return {
-                ...prev,
-                [agentKey]: { ...currentAgent, logs: newLogs, status: newStatus }
-              };
-            });
-          }
-        } else if (update.type === 'agent_status') {
-          if (update.agent === 'orchestrator') {
-            setMarketData(prev => ({ ...prev, status: update.status }));
-          } else {
-            const agentKey = update.agent === 'UI' ? AgentType.UI :
-              update.agent === 'Functional' ? AgentType.Functional : AgentType.DB;
-            setAgentData(prev => ({
-              ...prev,
-              [agentKey]: { ...prev[agentKey], status: update.status }
-            }));
-          }
-        } else if (update.type === 'test_complete') {
-          console.log('🎉 TEST COMPLETED - Processing results...');
-          console.log('📊 Results received:', update.results);
-          console.log('🐛 Issues count:', update.results?.issues?.length || 0);
-          console.log('📋 Issues details:', update.results?.issues);
+  //             // Auto-set status to Running when first log appears
+  //             let newStatus = currentAgent.status;
+  //             if (currentAgent.status === AgentStatus.Idle && newLogs.length === 1) {
+  //               newStatus = AgentStatus.Running;
+  //             }
+  //             // Auto-set status to Completed when agent says it's complete
+  //             if (update.message.toLowerCase().includes('complete') ||
+  //               update.message.toLowerCase().includes('finished') ||
+  //               update.message.toLowerCase().includes('task complete')) {
+  //               newStatus = AgentStatus.Completed;
+  //             }
 
-          // Set all agents to completed when test finishes
-          setAgentData(prev => {
-            const updated = { ...prev };
-            Object.keys(updated).forEach(key => {
-              if (updated[key].logs.length > 0) {
-                updated[key] = { ...updated[key], status: AgentStatus.Completed };
-              }
-            });
-            return updated;
-          });
+  //             return {
+  //               ...prev,
+  //               [agentKey]: { ...currentAgent, logs: newLogs, status: newStatus }
+  //             };
+  //           });
+  //         }
+  //       } else if (update.type === 'agent_status') {
+  //         if (update.agent === 'orchestrator') {
+  //           setMarketData(prev => ({ ...prev, status: update.status }));
+  //         } else {
+  //           const agentKey = update.agent === 'UI' ? AgentType.UI :
+  //             update.agent === 'Functional' ? AgentType.Functional : AgentType.DB;
+  //           setAgentData(prev => ({
+  //             ...prev,
+  //             [agentKey]: { ...prev[agentKey], status: update.status }
+  //           }));
+  //         }
+  //       } else if (update.type === 'test_complete') {
+  //         console.log('🎉 TEST COMPLETED - Processing results...');
+  //         console.log('📊 Results received:', update.results);
+  //         console.log('🐛 Issues count:', update.results?.issues?.length || 0);
+  //         console.log('📋 Issues details:', update.results?.issues);
 
-          setMarketData(prev => ({ ...prev, status: AgentStatus.Completed }));
+  //         // Set all agents to completed when test finishes
+  //         setAgentData(prev => {
+  //           const updated = { ...prev };
+  //           Object.keys(updated).forEach(key => {
+  //             if (updated[key].logs.length > 0) {
+  //               updated[key] = { ...updated[key], status: AgentStatus.Completed };
+  //             }
+  //           });
+  //           return updated;
+  //         });
 
-          // Validate and set results with multiple safeguards
-          if (update.results) {
-            console.log('✅ Setting results with', update.results.issues?.length || 0, 'issues');
+  //         setMarketData(prev => ({ ...prev, status: AgentStatus.Completed }));
 
-            // Store in localStorage immediately as backup
-            try {
-              localStorage.setItem('lastTestResults', JSON.stringify(update.results));
-              localStorage.setItem('lastTestTimestamp', Date.now().toString());
-              console.log('💾 Results backed up to localStorage');
-            } catch (e) {
-              console.warn('Failed to backup results:', e);
-            }
+  //         // Validate and set results with multiple safeguards
+  //         if (update.results) {
+  //           console.log('✅ Setting results with', update.results.issues?.length || 0, 'issues');
 
-            // Set results with state persistence
-            setResults(update.results);
-            setTestCompleted(true);
+  //           // Store in localStorage immediately as backup
+  //           try {
+  //             localStorage.setItem('lastTestResults', JSON.stringify(update.results));
+  //             localStorage.setItem('lastTestTimestamp', Date.now().toString());
+  //             console.log('💾 Results backed up to localStorage');
+  //           } catch (e) {
+  //             console.warn('Failed to backup results:', e);
+  //           }
 
-            // Force multiple re-renders to ensure UI updates
-            setTimeout(() => {
-              console.log('🔄 Forcing UI refresh 1...');
-              setResults(prev => prev ? { ...prev } : update.results);
-            }, 100);
+  //           // Set results with state persistence
+  //           setResults(update.results);
+  //           setTestCompleted(true);
 
-            setTimeout(() => {
-              console.log('🔄 Forcing UI refresh 2...');
-              setResults(prev => prev ? { ...prev } : update.results);
-            }, 500);
+  //           // Force multiple re-renders to ensure UI updates
+  //           setTimeout(() => {
+  //             console.log('🔄 Forcing UI refresh 1...');
+  //             setResults(prev => prev ? { ...prev } : update.results);
+  //           }, 100);
 
-          } else {
-            console.error('❌ No results in test completion');
-            // Try to recover from localStorage
-            const savedResults = localStorage.getItem('lastTestResults');
-            if (savedResults) {
-              try {
-                const parsedResults = JSON.parse(savedResults);
-                console.log('🔄 Recovered results from localStorage');
-                setResults(parsedResults);
-                setTestCompleted(true);
-              } catch (e) {
-                console.error('Failed to recover results:', e);
-              }
-            }
-          }
-        }
-      });
+  //           setTimeout(() => {
+  //             console.log('🔄 Forcing UI refresh 2...');
+  //             setResults(prev => prev ? { ...prev } : update.results);
+  //           }, 500);
 
-      // Note: Test completion is now handled via the test_complete update callback above
-      // The finalReport return is just for backup/debugging
+  //         } else {
+  //           console.error('❌ No results in test completion');
+  //           // Try to recover from localStorage
+  //           const savedResults = localStorage.getItem('lastTestResults');
+  //           if (savedResults) {
+  //             try {
+  //               const parsedResults = JSON.parse(savedResults);
+  //               console.log('🔄 Recovered results from localStorage');
+  //               setResults(parsedResults);
+  //               setTestCompleted(true);
+  //             } catch (e) {
+  //               console.error('Failed to recover results:', e);
+  //             }
+  //           }
+  //         }
+  //       }
+  //     });
 
-    } catch (e) {
-      console.error("Test process failed:", e);
-      setError("An error occurred during the testing process. Please check the console for details.");
-    } finally {
-      setIsTesting(false);
-    }
-  }, [url, budget, advancedModules]);
+  //     // Note: Test completion is now handled via the test_complete update callback above
+  //     // The finalReport return is just for backup/debugging
+
+  //   } catch (e) {
+  //     console.error("Test process failed:", e);
+  //     setError("An error occurred during the testing process. Please check the console for details.");
+  //   } finally {
+  //     setIsTesting(false);
+  //   }
+  // }, [url, budget, advancedModules]);
 
   return (
     <>
