@@ -8,7 +8,7 @@ const ai = apiKey
   ? new GoogleGenAI({ apiKey })
   : null;
 
-const model = "gemini-2.5-flash";
+const model = "gemini-3.8-flash";
 
 const marketControllerPrompt = (url: string, budget: number, activeModules: string[]) => `You are a Market Controller AI for TestMarket, managing an E2E test of ${url} with a budget of ${budget} compute units. Active mechanisms: ${activeModules.join(', ')}.
 Generate a realistic, time-ordered stream of 10-12 concise log messages simulating a market-driven test.
