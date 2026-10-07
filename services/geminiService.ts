@@ -135,6 +135,58 @@ const runRealAITest = async (
   return finalReport;
 };
 
+// These canned logs keep the fallback path entirely local when Gemini is unavailable.
+const runLocalOrchestratorSimulation = async (
+  url: string,
+  budget: number,
+  activeModules: AdvancedModule[],
+  onLogMessage: (message: string) => void
+): Promise<string> => {
+  const logs = [
+    `Simulation started for ${url} with a budget of ${budget} compute units.`,
+    'Discovered tasks: verify login, inspect page layout, and validate data persistence.',
+    'UI Agent won the page layout task auction.',
+    'Functional Agent won the login validation task auction.',
+    'DB Agent won the data persistence task auction.',
+    `Active modules: ${activeModules.length ? activeModules.join(', ') : 'none'}.`,
+    'Market session complete. All tasks assigned.'
+  ];
+  logs.forEach(onLogMessage);
+  return logs.join('\n');
+};
+
+const runLocalAgentSimulation = async (
+  agentType: AgentType,
+  onLogMessage: (message: string) => void
+): Promise<string> => {
+  const logsByAgent: Record<AgentType, string[]> = {
+    [AgentType.UI]: [
+      'UI agent online and observing the market.',
+      'Bidding on the page layout task.',
+      'Executing simulated visual checks.',
+      'Issue detected: overlapping text on a page element.',
+      'UI agent task complete.'
+    ],
+    [AgentType.Functional]: [
+      'Functional agent observing the market.',
+      'Bidding on the login validation task.',
+      'Running simulated form and API checks.',
+      'Cart total does not update correctly after a change.',
+      'Functional agent task complete.'
+    ],
+    [AgentType.DB]: [
+      'Database agent online and monitoring market activity.',
+      'Bidding on the data persistence task.',
+      'Running simulated persistence checks.',
+      'Data inconsistency: last_login timestamp not updating.',
+      'Database agent task complete.'
+    ]
+  };
+  const logs = logsByAgent[agentType];
+  logs.forEach(onLogMessage);
+  return logs.join('\n');
+};
+
 export const runRealTest = async (
   url: string, 
   budget: number, 
@@ -177,14 +229,14 @@ export const runRealTest = async (
     
     // Enhanced simulation with issue detection
     console.log('🚀 Starting SIMULATION orchestrator...');
-    const orchestratorLogs = await runOrchestratorSimulation(url, budget, activeModules, (log) => {
+    const orchestratorLogs = await runLocalOrchestratorSimulation(url, budget, activeModules, (log) => {
       console.log('📋 [SIM ORCHESTRATOR]:', log);
       onUpdate({ type: 'log', agent: 'orchestrator', message: log });
     });
     
     console.log('🤖 Starting SIMULATION agents...');
     const agentLogs = await Promise.all([
-      runAgentSimulation(AgentType.UI, url, (log) => {
+      runLocalAgentSimulation(AgentType.UI, (log) => {
         console.log('🖥️ [SIM UI]:', log);
         onUpdate({ type: 'log', agent: 'UI', message: log });
         
@@ -198,7 +250,7 @@ export const runRealTest = async (
           });
         }
       }),
-      runAgentSimulation(AgentType.Functional, url, (log) => {
+      runLocalAgentSimulation(AgentType.Functional, (log) => {
         console.log('⚙️ [SIM FUNCTIONAL]:', log);
         onUpdate({ type: 'log', agent: 'Functional', message: log });
         
@@ -212,7 +264,7 @@ export const runRealTest = async (
           });
         }
       }),
-      runAgentSimulation(AgentType.DB, url, (log) => {
+      runLocalAgentSimulation(AgentType.DB, (log) => {
         console.log('🗄️ [SIM DATABASE]:', log);
         onUpdate({ type: 'log', agent: 'DB', message: log });
         
@@ -233,7 +285,7 @@ export const runRealTest = async (
     console.log('🐛 Issues detected during simulation:', detectedIssues.length);
     
     console.log('🤖 Generating SIMULATION final report...');
-    const finalReport = await generateFinalReport(combinedLogs, url);
+    const finalReport = createLocalSimulationReport(url, combinedLogs);
     
     // Ensure we have issues in the report - ALWAYS use dynamic generation for consistency
     console.log('🔧 Enhancing report with dynamic issues...');
@@ -751,6 +803,26 @@ const generateDynamicIssues = (url: string, logs: string) => {
   console.log('📊 Total issues generated:', issues.length);
   console.log('🔍 Issues breakdown:', issues.map(i => `${i.id}: ${i.severity} - ${i.description.substring(0, 50)}...`));
   return issues;
+};
+
+const createLocalSimulationReport = (url: string, logs: string): TestResult => {
+  const issues = generateDynamicIssues(url, logs);
+  const testsFailed = issues.filter(issue => issue.severity === 'Critical' || issue.severity === 'High').length;
+  return {
+    summary: {
+      testsPassed: Math.max(15, 25 - testsFailed),
+      testsFailed,
+      bugsFound: issues.length,
+      coveragePercent: Math.max(85, 95 - issues.length)
+    },
+    kpis: {
+      efficiency: parseFloat((issues.length / 10).toFixed(2)),
+      meanTimeToDetect: 12,
+      flakinessScore: 5,
+      agentROI: { ui: 150, functional: 160, db: 140 }
+    },
+    issues
+  };
 };
 
 export const generateFinalReport = async (
