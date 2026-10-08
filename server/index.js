@@ -2,8 +2,28 @@ import express from 'express';
 import cors from 'cors';
 import { WebSocketServer } from 'ws';
 import { createServer } from 'http';
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { GoogleGenAI } from '@google/genai';
 import { TestOrchestrator } from './orchestrator/TestOrchestrator.js';
 import { DatabaseManager } from './database/DatabaseManager.js';
+
+// Load local server settings without exposing them to Vite's client bundle.
+const localEnvPath = resolve(process.cwd(), '.env.local');
+if (existsSync(localEnvPath)) {
+  const localEnv = readFileSync(localEnvPath, 'utf8');
+  for (const line of localEnv.split(/\r?\n/)) {
+    const match = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
+    if (!match || process.env[match[1]] !== undefined) continue;
+    let value = match[2];
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    } else {
+      value = value.replace(/\s+#.*$/, '');
+    }
+    process.env[match[1]] = value;
+  }
+}
 
 const app = express();
 const server = createServer(app);
@@ -66,6 +86,42 @@ app.get('/api/health', (req, res) => {
       websocket: 'active'
     }
   });
+});
+
+app.post('/api/gemini', async (req, res) => {
+  const { model, contents, config, stream = false } = req.body || {};
+  const apiKey = process.env.GEMINI_API_KEY;
+
+  if (!apiKey) {
+    return res.status(503).json({ error: 'Gemini API is not configured on the server (GEMINI_API_KEY is missing).' });
+  }
+  if (typeof model !== 'string' || !model || typeof contents !== 'string') {
+    return res.status(400).json({ error: 'Gemini requests require a model and string contents.' });
+  }
+
+  try {
+    const ai = new GoogleGenAI({ apiKey });
+    if (stream) {
+      res.status(200);
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-cache, no-transform');
+      res.setHeader('X-Accel-Buffering', 'no');
+
+      const responseStream = await ai.models.generateContentStream({ model, contents, config });
+      for await (const chunk of responseStream) {
+        if (chunk.text) res.write(chunk.text);
+      }
+      return res.end();
+    }
+
+    const response = await ai.models.generateContent({ model, contents, config });
+    return res.json({ text: response.text ?? '' });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown Gemini request error.';
+    const safeMessage = apiKey ? message.split(apiKey).join('[redacted]') : message;
+    if (res.headersSent) return res.destroy();
+    return res.status(502).json({ error: `Gemini request failed: ${safeMessage}` });
+  }
 });
 
 // REST API endpoints

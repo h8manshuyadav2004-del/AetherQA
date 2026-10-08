@@ -1,14 +1,20 @@
-import { GoogleGenAI, Type } from "@google/genai";
 import { AgentType, TestResult, AdvancedModule, A11yAgentType, A11yReport } from '../types';
 import { realTestingService } from './realTestingService';
 
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+const model = "gemini-3.5-flash-lite";
 
-const ai = apiKey
-  ? new GoogleGenAI({ apiKey })
-  : null;
-
-const model = "gemini-3.8-flash";
+const requestGemini = async (contents: string, config?: Record<string, unknown>) => {
+  const response = await fetch('/api/gemini', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model, contents, config })
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(result.error || `Gemini request failed with status ${response.status}.`);
+  }
+  return result as { text?: string };
+};
 
 const marketControllerPrompt = (url: string, budget: number, activeModules: string[]) => `You are a Market Controller AI for TestMarket, managing an E2E test of ${url} with a budget of ${budget} compute units. Active mechanisms: ${activeModules.join(', ')}.
 Generate a realistic, time-ordered stream of 10-12 concise log messages simulating a market-driven test.
@@ -53,22 +59,38 @@ const runStreamSimulation = async (
 ): Promise<string> => {
   let fullLog = '';
   try {
-    const responseStream = await ai.models.generateContentStream({
-      model,
-      contents: prompt,
+    const response = await fetch('/api/gemini', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model, contents: prompt, stream: true })
     });
-
-    for await (const chunk of responseStream) {
-      const text = chunk.text;
-      if (text) {
-        const messages = text.split('\n').filter(msg => msg.trim() !== '');
-        messages.forEach(msg => {
-            const cleanedMsg = msg.replace(/^- /, '').trim();
-            onLogMessage(cleanedMsg);
-            fullLog += cleanedMsg + '\n';
-        });
-      }
+    if (!response.ok) {
+      const result = await response.json().catch(() => ({}));
+      throw new Error(result.error || `Gemini request failed with status ${response.status}.`);
     }
+    if (!response.body) throw new Error('Gemini streaming response body is unavailable.');
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let pending = '';
+    const emitLines = (text: string) => {
+      const messages = text.split('\n').filter(msg => msg.trim() !== '');
+      messages.forEach(msg => {
+        const cleanedMsg = msg.replace(/^- /, '').trim();
+        onLogMessage(cleanedMsg);
+        fullLog += cleanedMsg + '\n';
+      });
+    };
+
+    while (true) {
+      const { done, value } = await reader.read();
+      pending += decoder.decode(value, { stream: !done });
+      if (done) break;
+      const lines = pending.split('\n');
+      pending = lines.pop() || '';
+      emitLines(lines.join('\n'));
+    }
+    emitLines(pending);
   } catch(e) {
     const errorMessage = `Error with generative model. Check API key and network.`;
     onLogMessage(errorMessage);
@@ -194,13 +216,7 @@ export const runRealTest = async (
   onUpdate: (update: any) => void
 ): Promise<TestResult> => {
   try {
-    // Check if we should use real API or simulation
-    if (!apiKey || !ai) {
-      console.log('🚫 No API key available, using simulation mode');
-      throw new Error('No API key - using simulation mode');
-    }
-    
-    console.log('🚀 API key available - using REAL Gemini AI testing');
+    console.log('🚀 Attempting REAL Gemini AI testing via server endpoint');
     
     // Send status update to frontend
     onUpdate({ 
@@ -393,37 +409,37 @@ The JSON must match the provided schema precisely. The issues must be realistic 
 `;
 
   const responseSchema = {
-    type: Type.OBJECT,
+    type: "OBJECT",
     properties: {
       summary: {
-        type: Type.OBJECT,
+        type: "OBJECT",
         properties: {
-          url: { type: Type.STRING },
-          issuesFound: { type: Type.INTEGER },
-          issuesFixed: { type: Type.INTEGER },
-          accessibilityScore: { type: Type.INTEGER },
+          url: { type: "STRING" },
+          issuesFound: { type: "INTEGER" },
+          issuesFixed: { type: "INTEGER" },
+          accessibilityScore: { type: "INTEGER" },
         },
         required: ["url", "issuesFound", "issuesFixed", "accessibilityScore"],
       },
       issues: {
-        type: Type.ARRAY,
+        type: "ARRAY",
         items: {
-          type: Type.OBJECT,
+          type: "OBJECT",
           properties: {
-            id: { type: Type.STRING },
-            wcag: { type: Type.STRING },
-            severity: { type: Type.STRING },
-            description: { type: Type.STRING },
-            element: { type: Type.STRING },
+            id: { type: "STRING" },
+            wcag: { type: "STRING" },
+            severity: { type: "STRING" },
+            description: { type: "STRING" },
+            element: { type: "STRING" },
             fix: {
-                type: Type.OBJECT,
+                type: "OBJECT",
                 properties: {
-                    recommendation: { type: Type.STRING },
-                    codeDiff: { type: Type.STRING },
+                    recommendation: { type: "STRING" },
+                    codeDiff: { type: "STRING" },
                 },
                 required: ["recommendation", "codeDiff"],
             },
-            prLink: { type: Type.STRING },
+            prLink: { type: "STRING" },
           },
           required: ["id", "wcag", "severity", "description", "element", "fix", "prLink"],
         },
@@ -432,13 +448,9 @@ The JSON must match the provided schema precisely. The issues must be realistic 
     required: ["summary", "issues"],
   };
 
-  const response = await ai.models.generateContent({
-      model,
-      contents: reportPrompt,
-      config: {
+  const response = await requestGemini(reportPrompt, {
           responseMimeType: 'application/json',
           responseSchema: responseSchema,
-      },
   });
 
   const jsonText = response.text.trim();
@@ -454,10 +466,7 @@ The report should be in Markdown format and include:
 - A list of 2-3 fictional sources.
 Keep the entire report under 300 words.`;
     
-    const response = await ai.models.generateContent({
-        model,
-        contents: prompt,
-    });
+    const response = await requestGemini(prompt);
 
     return response.text;
 };
@@ -476,10 +485,7 @@ ${code}
 \`\`\`
 `;
     
-    const response = await ai.models.generateContent({
-        model,
-        contents: prompt,
-    });
+    const response = await requestGemini(prompt);
     
     return response.text;
 };
@@ -495,10 +501,7 @@ Format the response in Markdown.
 User Idea: "${idea}"
 `;
 
-    const response = await ai.models.generateContent({
-        model,
-        contents: prompt,
-    });
+    const response = await requestGemini(prompt);
 
     return response.text;
 };
@@ -521,10 +524,7 @@ ${data}
 ---
 `;
 
-    const response = await ai.models.generateContent({
-        model,
-        contents: prompt,
-    });
+    const response = await requestGemini(prompt);
 
     return response.text;
 };
@@ -546,27 +546,23 @@ Based on the user's last message, generate the next responses for both the AI Op
 Your response MUST be a JSON object.`;
 
     const responseSchema = {
-        type: Type.OBJECT,
+        type: "OBJECT",
         properties: {
             teammateResponse: {
-                type: Type.STRING,
+                type: "STRING",
                 description: "Strategic advice from the teammate to the user."
             },
             opponentResponse: {
-                type: Type.STRING,
+                type: "STRING",
                 description: "The next response from the opponent in the negotiation."
             }
         },
         required: ["teammateResponse", "opponentResponse"]
     };
 
-    const response = await ai.models.generateContent({
-        model,
-        contents: prompt,
-        config: {
+    const response = await requestGemini(prompt, {
             responseMimeType: 'application/json',
             responseSchema: responseSchema,
-        },
     });
 
     // Trim to be safe for JSON parsing, following the pattern in generateFinalReport
@@ -856,30 +852,30 @@ The issues must be realistic and directly derived from the logs provided (e.g., 
 `;
 
   const responseSchema = {
-    type: Type.OBJECT,
+    type: "OBJECT",
     properties: {
       summary: {
-        type: Type.OBJECT,
+        type: "OBJECT",
         properties: {
-          testsPassed: { type: Type.INTEGER },
-          testsFailed: { type: Type.INTEGER },
-          bugsFound: { type: Type.INTEGER },
-          coveragePercent: { type: Type.INTEGER },
+          testsPassed: { type: "INTEGER" },
+          testsFailed: { type: "INTEGER" },
+          bugsFound: { type: "INTEGER" },
+          coveragePercent: { type: "INTEGER" },
         },
         required: ["testsPassed", "testsFailed", "bugsFound", "coveragePercent"],
       },
       kpis: {
-        type: Type.OBJECT,
+        type: "OBJECT",
         properties: {
-            efficiency: { type: Type.NUMBER },
-            meanTimeToDetect: { type: Type.INTEGER },
-            flakinessScore: { type: Type.INTEGER },
+            efficiency: { type: "NUMBER" },
+            meanTimeToDetect: { type: "INTEGER" },
+            flakinessScore: { type: "INTEGER" },
             agentROI: {
-                type: Type.OBJECT,
+                type: "OBJECT",
                 properties: {
-                    ui: { type: Type.INTEGER },
-                    functional: { type: Type.INTEGER },
-                    db: { type: Type.INTEGER }
+                    ui: { type: "INTEGER" },
+                    functional: { type: "INTEGER" },
+                    db: { type: "INTEGER" }
                 },
                 required: ['ui', 'functional', 'db']
             }
@@ -887,25 +883,25 @@ The issues must be realistic and directly derived from the logs provided (e.g., 
         required: ['efficiency', 'meanTimeToDetect', 'flakinessScore', 'agentROI']
       },
       issues: {
-        type: Type.ARRAY,
+        type: "ARRAY",
         items: {
-          type: Type.OBJECT,
+          type: "OBJECT",
           properties: {
-            id: { type: Type.STRING },
-            severity: { type: Type.STRING },
-            agent: { type: Type.STRING },
-            description: { type: Type.STRING },
-            recommendation: { type: Type.STRING },
-            causalTrace: { type: Type.STRING },
-            confidence: { type: Type.INTEGER },
-            persona: { type: Type.STRING },
+            id: { type: "STRING" },
+            severity: { type: "STRING" },
+            agent: { type: "STRING" },
+            description: { type: "STRING" },
+            recommendation: { type: "STRING" },
+            causalTrace: { type: "STRING" },
+            confidence: { type: "INTEGER" },
+            persona: { type: "STRING" },
             evidence: {
-              type: Type.ARRAY,
+              type: "ARRAY",
               items: {
-                type: Type.OBJECT,
+                type: "OBJECT",
                 properties: {
-                  type: { type: Type.STRING },
-                  link: { type: Type.STRING },
+                  type: { type: "STRING" },
+                  link: { type: "STRING" },
                 },
                 required: ["type", "link"],
               }
@@ -920,13 +916,9 @@ The issues must be realistic and directly derived from the logs provided (e.g., 
 
   try {
     
-    const response = await ai.models.generateContent({
-        model,
-        contents: reportPrompt,
-        config: {
+    const response = await requestGemini(reportPrompt, {
             responseMimeType: 'application/json',
             responseSchema: responseSchema,
-        },
     });
 
     const jsonText = response.text.trim();
