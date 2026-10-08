@@ -2,9 +2,10 @@ import { AgentType, TestResult, AdvancedModule, A11yAgentType, A11yReport } from
 import { realTestingService } from './realTestingService';
 
 const model = "gemini-3.5-flash-lite";
+const geminiApiUrl = `${import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') ?? ''}/api/gemini`;
 
 const requestGemini = async (contents: string, config?: Record<string, unknown>) => {
-  const response = await fetch('/api/gemini', {
+  const response = await fetch(geminiApiUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ model, contents, config })
@@ -59,7 +60,7 @@ const runStreamSimulation = async (
 ): Promise<string> => {
   let fullLog = '';
   try {
-    const response = await fetch('/api/gemini', {
+    const response = await fetch(geminiApiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model, contents: prompt, stream: true })
